@@ -1,0 +1,69 @@
+name: Notify Slack
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Version being released"
+        required: true
+        type: string
+      status:
+        description: "Status of the release (success/failure)"
+        required: true
+        type: string
+      message:
+        description: "Custom message to include"
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  notify:
+    name: Send Slack Notification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send notification
+        if: ${{ vars.SLACK_WEBHOOK_URL != '' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ vars.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ "${{ inputs.status }}" = "success" ]; then
+            EMOJI=":white_check_mark:"
+            COLOR="good"
+          else
+            EMOJI=":x:"
+            COLOR="danger"
+          fi
+
+          MESSAGE="${{ inputs.message }}"
+          if [ -z "$MESSAGE" ]; then
+            MESSAGE="Release ${{ inputs.version }} completed with status: ${{ inputs.status }}"
+          fi
+
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{
+              \"attachments\": [
+                {
+                  \"color\": \"${COLOR}\",
+                  \"blocks\": [
+                    {
+                      \"type\": \"section\",
+                      \"text\": {
+                        \"type\": \"mrkdwn\",
+                        \"text\": \"${EMOJI} *txova-go-kafka*\n${MESSAGE}\"
+                      }
+                    },
+                    {
+                      \"type\": \"context\",
+                      \"elements\": [
+                        {
+                          \"type\": \"mrkdwn\",
+                          \"text\": \"Version: \`${{ inputs.version }}\` | <${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ inputs.version }}|View Release>\"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }" \
+            "$SLACK_WEBHOOK_URL"
