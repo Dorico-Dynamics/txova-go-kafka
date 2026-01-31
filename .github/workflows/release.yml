@@ -37,11 +37,11 @@ jobs:
           MINOR=$(echo $VERSION | cut -d. -f2)
           PATCH=$(echo $VERSION | cut -d. -f3)
 
-          # Get commits since last tag
+          # Get commits since last tag (include full commit bodies for BREAKING CHANGE detection)
           if [ "$LATEST_TAG" = "v0.0.0" ]; then
-            COMMITS=$(git log --oneline)
+            COMMITS=$(git log --pretty=format:'%H%n%s%n%b%n---COMMIT-END---')
           else
-            COMMITS=$(git log ${LATEST_TAG}..HEAD --oneline)
+            COMMITS=$(git log ${LATEST_TAG}..HEAD --pretty=format:'%H%n%s%n%b%n---COMMIT-END---')
           fi
 
           if [ -z "$COMMITS" ]; then
@@ -54,16 +54,17 @@ jobs:
           echo "$COMMITS"
 
           # Determine version bump based on conventional commits
-          if echo "$COMMITS" | grep -qE "^[a-f0-9]+ (feat|feature)(\(.+\))?!:|^[a-f0-9]+ BREAKING CHANGE:"; then
+          # Check for BREAKING CHANGE in commit body or ! in commit subject
+          if echo "$COMMITS" | grep -qE "^(feat|feature)(\(.+\))?!:|BREAKING CHANGE:"; then
             # Breaking change - major bump
             MAJOR=$((MAJOR + 1))
             MINOR=0
             PATCH=0
-          elif echo "$COMMITS" | grep -qE "^[a-f0-9]+ (feat|feature)(\(.+\))?:"; then
+          elif echo "$COMMITS" | grep -qE "^(feat|feature)(\(.+\))?:"; then
             # Feature - minor bump
             MINOR=$((MINOR + 1))
             PATCH=0
-          elif echo "$COMMITS" | grep -qE "^[a-f0-9]+ (fix|bugfix|perf|refactor)(\(.+\))?:"; then
+          elif echo "$COMMITS" | grep -qE "^(fix|bugfix|perf|refactor)(\(.+\))?:"; then
             # Fix/perf/refactor - patch bump
             PATCH=$((PATCH + 1))
           else
@@ -88,11 +89,18 @@ jobs:
         if: steps.version.outputs.released == 'true'
         id: notes
         run: |
-          LATEST_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-          if [ -z "$LATEST_TAG" ]; then
-            COMMITS=$(git log --oneline --pretty=format:"- %s (%h)" | head -50)
+          LATEST_TAG=$(git describe --tags --abbrev=0 HEAD 2>/dev/null || echo "")
+          # Get the previous tag before the one we just created
+          if [ -n "$LATEST_TAG" ]; then
+            PREV_TAG=$(git describe --tags --abbrev=0 ${LATEST_TAG}^1 2>/dev/null || echo "")
           else
-            COMMITS=$(git log ${LATEST_TAG}..HEAD~1 --oneline --pretty=format:"- %s (%h)")
+            PREV_TAG=""
+          fi
+
+          if [ -z "$PREV_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s (%h)" | head -50)
+          else
+            COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)")
           fi
 
           # Categorize commits
