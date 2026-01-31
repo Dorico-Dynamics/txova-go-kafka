@@ -36,6 +36,9 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.Timeout != 10*time.Second {
 		t.Errorf("Timeout = %v, want 10s", cfg.Timeout)
 	}
+	if cfg.Version != sarama.V0_11_0_0 {
+		t.Errorf("Version = %v, want %v", cfg.Version, sarama.V0_11_0_0)
+	}
 }
 
 func TestConfig_Validate(t *testing.T) {
@@ -106,6 +109,7 @@ func TestConfig_toSaramaConfig(t *testing.T) {
 		Compression:  sarama.CompressionGZIP,
 		Idempotent:   true,
 		Timeout:      15 * time.Second,
+		Version:      sarama.V2_8_0_0,
 	}
 
 	saramaCfg, err := cfg.toSaramaConfig()
@@ -115,6 +119,9 @@ func TestConfig_toSaramaConfig(t *testing.T) {
 
 	if saramaCfg.ClientID != cfg.ClientID {
 		t.Errorf("ClientID = %q, want %q", saramaCfg.ClientID, cfg.ClientID)
+	}
+	if saramaCfg.Version != cfg.Version {
+		t.Errorf("Version = %v, want %v", saramaCfg.Version, cfg.Version)
 	}
 	if saramaCfg.Producer.RequiredAcks != cfg.RequiredAcks {
 		t.Errorf("RequiredAcks = %v, want %v", saramaCfg.Producer.RequiredAcks, cfg.RequiredAcks)

@@ -310,7 +310,7 @@
 ## Success Criteria
 
 | Criteria | Target | Current |
-|----------|--------|---------|
+| -------- | ------ | ------- |
 | Test Coverage | >85% | - |
 | External Dependencies | 1 (sarama) | - |
 | Linting Errors | 0 | - |
@@ -343,7 +343,7 @@ dlq (depends on: envelope, producer, consumer)
 ## Risk Mitigation
 
 | Risk | Mitigation |
-|------|------------|
+| ---- | ---------- |
 | Kafka connection failures | Implement retry with exponential backoff, circuit breaker pattern |
 | Message ordering issues | Partition by entity ID, document ordering guarantees |
 | Consumer lag buildup | Monitor lag metrics, auto-scale consumers, alert on threshold |

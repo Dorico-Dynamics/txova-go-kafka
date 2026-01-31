@@ -52,6 +52,10 @@ type Config struct {
 	// Timeout is the timeout for producing messages.
 	// Default: 10s.
 	Timeout time.Duration
+	// Version is the minimum Kafka version to target.
+	// Default: V0_11_0_0 (required for idempotent producer).
+	// Must be 0.11.0.0+ to support idempotent producer and exactly-once semantics.
+	Version sarama.KafkaVersion
 }
 
 // DefaultConfig returns a Config with sensible defaults for production.
@@ -65,6 +69,7 @@ func DefaultConfig() *Config {
 		Compression:  sarama.CompressionSnappy,
 		Idempotent:   true,
 		Timeout:      DefaultTimeout,
+		Version:      sarama.V0_11_0_0, // Minimum version for idempotent producer
 	}
 }
 
@@ -89,6 +94,7 @@ func (c *Config) toSaramaConfig() (*sarama.Config, error) {
 	cfg := sarama.NewConfig()
 
 	cfg.ClientID = c.ClientID
+	cfg.Version = c.Version
 	cfg.Producer.RequiredAcks = c.RequiredAcks
 	cfg.Producer.Retry.Max = c.MaxRetries
 	cfg.Producer.Retry.Backoff = c.RetryBackoff

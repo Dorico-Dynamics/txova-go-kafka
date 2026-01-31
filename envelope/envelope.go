@@ -144,6 +144,9 @@ func New(cfg *Config) (*Envelope, error) {
 // NewWithContext creates a new envelope, extracting the correlation ID from context
 // if not provided in the config.
 func NewWithContext(ctx context.Context, cfg *Config) (*Envelope, error) {
+	if cfg == nil {
+		return nil, ErrConfigRequired
+	}
 	if cfg.CorrelationID == "" {
 		cfg.CorrelationID = txctx.CorrelationID(ctx)
 	}
