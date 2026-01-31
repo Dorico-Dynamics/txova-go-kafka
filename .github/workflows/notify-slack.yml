@@ -1,0 +1,81 @@
+name: Notify Slack
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Version being released"
+        required: true
+        type: string
+      status:
+        description: "Status of the release (success/failure)"
+        required: true
+        type: string
+      message:
+        description: "Custom message to include"
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  notify:
+    name: Send Slack Notification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send notification
+        if: ${{ vars.SLACK_WEBHOOK_URL != '' }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ vars.SLACK_WEBHOOK_URL }}
+          INPUT_STATUS: ${{ inputs.status }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_MESSAGE: ${{ inputs.message }}
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ inputs.version }}
+        run: |
+          if [ "$INPUT_STATUS" = "success" ]; then
+            EMOJI=":white_check_mark:"
+            COLOR="good"
+          else
+            EMOJI=":x:"
+            COLOR="danger"
+          fi
+
+          MESSAGE="$INPUT_MESSAGE"
+          if [ -z "$MESSAGE" ]; then
+            MESSAGE="Release $INPUT_VERSION completed with status: $INPUT_STATUS"
+          fi
+
+          PAYLOAD=$(jq -n -c \
+            --arg color "$COLOR" \
+            --arg emoji "$EMOJI" \
+            --arg message "$MESSAGE" \
+            --arg version "$INPUT_VERSION" \
+            --arg release_url "$RELEASE_URL" \
+            '{
+              attachments: [
+                {
+                  color: $color,
+                  blocks: [
+                    {
+                      type: "section",
+                      text: {
+                        type: "mrkdwn",
+                        text: "\($emoji) *txova-go-kafka*\n\($message)"
+                      }
+                    },
+                    {
+                      type: "context",
+                      elements: [
+                        {
+                          type: "mrkdwn",
+                          text: "Version: `\($version)` | <\($release_url)|View Release>"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }')
+
+          curl -X POST -H 'Content-type: application/json' \
+            --data "$PAYLOAD" \
+            "$SLACK_WEBHOOK_URL"
