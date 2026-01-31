@@ -77,6 +77,9 @@ env, err := envelope.NewWithContext(ctx, &envelope.Config{
         Fare:         5000,
     },
 })
+if err != nil {
+    return err
+}
 
 // Publish (auto-routes to txova.rides.v1)
 err = prod.Publish(ctx, env, rideID.String())
@@ -106,7 +109,7 @@ registry.Register(events.EventTypeRideCompleted, func(ctx context.Context, env *
 // Create consumer
 cfg := consumer.DefaultConfig()
 cfg.Brokers = []string{"localhost:9092"}
-cfg.GroupID = topics.ConsumerGroupPaymentService.String()
+cfg.GroupID = topics.ConsumerGroupRideService.String()
 cfg.Topics = []string{topics.Rides.String()}
 
 cons, err := consumer.New(cfg, registry, logger)
