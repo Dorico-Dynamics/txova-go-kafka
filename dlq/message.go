@@ -30,6 +30,7 @@ type Message struct {
 }
 
 // NewMessage creates a new DLQ message from a failed event.
+// If err is nil, ErrorMessage will be set to an empty string.
 func NewMessage(
 	originalTopic string,
 	originalPartition int32,
@@ -39,11 +40,17 @@ func NewMessage(
 	attemptCount int,
 ) *Message {
 	now := time.Now().UTC()
+
+	errorMessage := ""
+	if err != nil {
+		errorMessage = err.Error()
+	}
+
 	return &Message{
 		OriginalTopic:     originalTopic,
 		OriginalPartition: originalPartition,
 		OriginalOffset:    originalOffset,
-		ErrorMessage:      err.Error(),
+		ErrorMessage:      errorMessage,
 		AttemptCount:      attemptCount,
 		FirstFailure:      now,
 		LastFailure:       now,

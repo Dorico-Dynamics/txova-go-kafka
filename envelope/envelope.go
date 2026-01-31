@@ -17,6 +17,8 @@ import (
 
 // Sentinel errors for envelope validation.
 var (
+	// ErrConfigRequired is returned when config is nil.
+	ErrConfigRequired = errors.New("config is required")
 	// ErrEventTypeRequired is returned when event type is empty.
 	ErrEventTypeRequired = errors.New("event type is required")
 	// ErrVersionRequired is returned when version is empty.
@@ -155,6 +157,9 @@ func NewWithContext(ctx context.Context, cfg *Config) (*Envelope, error) {
 
 // validateConfig validates the envelope configuration.
 func validateConfig(cfg *Config) error {
+	if cfg == nil {
+		return ErrConfigRequired
+	}
 	if cfg.Type == "" {
 		return ErrEventTypeRequired
 	}

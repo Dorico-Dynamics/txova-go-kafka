@@ -3,6 +3,7 @@ package dlq
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -10,6 +11,12 @@ import (
 
 	"github.com/Dorico-Dynamics/txova-go-kafka/envelope"
 	"github.com/Dorico-Dynamics/txova-go-kafka/topics"
+)
+
+// Sentinel errors for DLQ operations.
+var (
+	// ErrNilEnvelope is returned when a nil envelope is passed to Handle.
+	ErrNilEnvelope = errors.New("envelope cannot be nil")
 )
 
 // Handler handles failed messages by sending them to the dead letter queue.
@@ -39,6 +46,10 @@ func (h *Handler) Handle(
 	processingErr error,
 	attemptCount int,
 ) error {
+	if env == nil {
+		return ErrNilEnvelope
+	}
+
 	dlqMsg := NewMessage(
 		originalTopic,
 		originalPartition,
@@ -55,6 +66,12 @@ func (h *Handler) Handle(
 
 	dlqTopic := topics.Topic(originalTopic).DLQ()
 
+	// Safely extract error message
+	errorMessage := ""
+	if processingErr != nil {
+		errorMessage = processingErr.Error()
+	}
+
 	msg := &sarama.ProducerMessage{
 		Topic: dlqTopic.String(),
 		Key:   sarama.StringEncoder(env.ID),
@@ -63,7 +80,7 @@ func (h *Handler) Handle(
 			{Key: []byte("original_topic"), Value: []byte(originalTopic)},
 			{Key: []byte("event_type"), Value: []byte(env.Type)},
 			{Key: []byte("event_id"), Value: []byte(env.ID)},
-			{Key: []byte("error_message"), Value: []byte(processingErr.Error())},
+			{Key: []byte("error_message"), Value: []byte(errorMessage)},
 		},
 	}
 

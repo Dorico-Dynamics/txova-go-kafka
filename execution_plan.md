@@ -324,7 +324,7 @@
 
 ## Package Dependency Order
 
-```
+```text
 envelope (depends on: txova-go-types/ids, txova-go-core/context)
     ↓
 events (depends on: txova-go-types/*, envelope)
