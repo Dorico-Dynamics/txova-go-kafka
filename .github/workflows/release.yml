@@ -153,13 +153,26 @@ jobs:
           draft: false
           prerelease: false
 
-  notify:
-    name: Notify
+  notify-success:
+    name: Notify Success
     needs: release
     if: needs.release.outputs.released == 'true'
     uses: ./.github/workflows/notify-slack.yml
     with:
+      status: SUCCESS
       version: ${{ needs.release.outputs.version }}
-      status: "success"
-      message: "txova-go-kafka ${{ needs.release.outputs.version }} has been released"
-    secrets: inherit
+      triggered_by: ${{ github.actor }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_TXOVA }}
+
+  notify-failure:
+    name: Notify Failure
+    needs: release
+    if: failure()
+    uses: ./.github/workflows/notify-slack.yml
+    with:
+      status: FAILURE
+      version: ${{ needs.release.outputs.version || 'unknown' }}
+      triggered_by: ${{ github.actor }}
+    secrets:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_TXOVA }}
