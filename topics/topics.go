@@ -116,20 +116,36 @@ type Config struct {
 	RetentionMs int64
 }
 
+// Default topic configuration values.
+const (
+	// DefaultNumPartitions is the default number of partitions for production topics.
+	DefaultNumPartitions int32 = 12
+	// DefaultReplicationFactor is the default replication factor for production topics.
+	DefaultReplicationFactor int16 = 3
+	// DefaultRetentionMs is the default retention period (7 days in milliseconds).
+	DefaultRetentionMs int64 = 7 * 24 * 60 * 60 * 1000
+	// DevNumPartitions is the number of partitions for development topics.
+	DevNumPartitions int32 = 3
+	// DevReplicationFactor is the replication factor for development topics.
+	DevReplicationFactor int16 = 1
+	// DevRetentionMs is the retention period for development topics (1 day in milliseconds).
+	DevRetentionMs int64 = 24 * 60 * 60 * 1000
+)
+
 // DefaultConfig returns the default topic configuration.
 func DefaultConfig() Config {
 	return Config{
-		NumPartitions:     12,
-		ReplicationFactor: 3,
-		RetentionMs:       7 * 24 * 60 * 60 * 1000, // 7 days
+		NumPartitions:     DefaultNumPartitions,
+		ReplicationFactor: DefaultReplicationFactor,
+		RetentionMs:       DefaultRetentionMs,
 	}
 }
 
 // DevConfig returns a topic configuration suitable for development.
 func DevConfig() Config {
 	return Config{
-		NumPartitions:     3,
-		ReplicationFactor: 1,
-		RetentionMs:       24 * 60 * 60 * 1000, // 1 day
+		NumPartitions:     DevNumPartitions,
+		ReplicationFactor: DevReplicationFactor,
+		RetentionMs:       DevRetentionMs,
 	}
 }

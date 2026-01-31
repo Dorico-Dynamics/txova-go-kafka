@@ -3,6 +3,7 @@ package dlq
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/Dorico-Dynamics/txova-go-kafka/envelope"
@@ -53,11 +54,18 @@ func NewMessage(
 // MarshalJSON implements json.Marshaler.
 func (m *Message) MarshalJSON() ([]byte, error) {
 	type alias Message
-	return json.Marshal((*alias)(m))
+	data, err := json.Marshal((*alias)(m))
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal DLQ message: %w", err)
+	}
+	return data, nil
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
 func (m *Message) UnmarshalJSON(data []byte) error {
 	type alias Message
-	return json.Unmarshal(data, (*alias)(m))
+	if err := json.Unmarshal(data, (*alias)(m)); err != nil {
+		return fmt.Errorf("failed to unmarshal DLQ message: %w", err)
+	}
+	return nil
 }

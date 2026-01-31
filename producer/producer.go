@@ -57,7 +57,7 @@ func New(cfg *Config, logger *slog.Logger) (*Producer, error) {
 func (p *Producer) Publish(ctx context.Context, env *envelope.Envelope, partitionKey string) error {
 	topic := topics.ForEventType(events.EventType(env.Type))
 	if topic == "" {
-		return fmt.Errorf("no topic for event type %q", env.Type)
+		return fmt.Errorf("%w: %s", ErrNoTopicForEventType, env.Type)
 	}
 
 	return p.PublishToTopic(ctx, topic, env, partitionKey)
@@ -123,7 +123,7 @@ func (p *Producer) PublishToTopic(ctx context.Context, topic topics.Topic, env *
 // PublishBatch publishes multiple envelopes to their appropriate topics.
 func (p *Producer) PublishBatch(ctx context.Context, envs []*envelope.Envelope, partitionKeys []string) error {
 	if len(envs) != len(partitionKeys) {
-		return fmt.Errorf("envelopes and partition keys must have the same length")
+		return ErrBatchLengthMismatch
 	}
 
 	for i, env := range envs {

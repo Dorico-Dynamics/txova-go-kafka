@@ -83,12 +83,12 @@ func (c *Consumer) Start(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return context.Cause(ctx) //nolint:wrapcheck // Context errors are terminal and should not be wrapped.
 		default:
 			err := c.client.Consume(ctx, c.config.Topics, handler)
 			if err != nil {
 				if ctx.Err() != nil {
-					return ctx.Err()
+					return context.Cause(ctx) //nolint:wrapcheck // Context errors are terminal and should not be wrapped.
 				}
 				c.logger.ErrorContext(ctx, "error consuming",
 					slog.String("error", err.Error()),

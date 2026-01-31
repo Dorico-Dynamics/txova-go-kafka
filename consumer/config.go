@@ -17,6 +17,20 @@ const (
 	OffsetResetLatest OffsetReset = "latest"
 )
 
+// Default configuration values.
+const (
+	// DefaultMaxPollRecords is the default maximum number of records to fetch per poll.
+	DefaultMaxPollRecords = 100
+	// DefaultSessionTimeout is the default timeout for consumer session.
+	DefaultSessionTimeout = 30 * time.Second
+	// DefaultHeartbeatInterval is the default expected time between heartbeats.
+	DefaultHeartbeatInterval = 10 * time.Second
+	// DefaultProcessingTimeout is the default timeout for processing a single message.
+	DefaultProcessingTimeout = 30 * time.Second
+	// DefaultMaxRetries is the default number of retry attempts before sending to DLQ.
+	DefaultMaxRetries = 3
+)
+
 // Config holds the configuration for a Kafka consumer.
 type Config struct {
 	// Brokers is the list of Kafka broker addresses.
@@ -53,11 +67,11 @@ func DefaultConfig() *Config {
 	return &Config{
 		OffsetReset:       OffsetResetEarliest,
 		EnableAutoCommit:  false,
-		MaxPollRecords:    100,
-		SessionTimeout:    30 * time.Second,
-		HeartbeatInterval: 10 * time.Second,
-		ProcessingTimeout: 30 * time.Second,
-		MaxRetries:        3,
+		MaxPollRecords:    DefaultMaxPollRecords,
+		SessionTimeout:    DefaultSessionTimeout,
+		HeartbeatInterval: DefaultHeartbeatInterval,
+		ProcessingTimeout: DefaultProcessingTimeout,
+		MaxRetries:        DefaultMaxRetries,
 	}
 }
 

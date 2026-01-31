@@ -49,6 +49,13 @@ linters:
     - unconvert
     - unparam
     - whitespace
+    # Additional security and best practice linters
+    - err113
+    - wrapcheck
+    - forcetypeassert
+    - mnd
+    - sloglint
+    - perfsprint
 
   settings:
     errcheck:
@@ -136,6 +143,9 @@ linters:
           - errorlint
           - intrange
           - nestif
+          - err113
+          - wrapcheck
+          - forcetypeassert
 
       - path: _test\.go
         text: "fieldalignment"

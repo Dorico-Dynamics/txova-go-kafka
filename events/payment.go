@@ -1,6 +1,8 @@
 package events
 
 import (
+	"fmt"
+
 	"github.com/Dorico-Dynamics/txova-go-types/enums"
 	"github.com/Dorico-Dynamics/txova-go-types/ids"
 )
@@ -42,7 +44,7 @@ type PayoutID struct {
 func NewPayoutID() (PayoutID, error) {
 	uuid, err := ids.NewUUID()
 	if err != nil {
-		return PayoutID{}, err
+		return PayoutID{}, fmt.Errorf("failed to generate payout ID: %w", err)
 	}
 	return PayoutID{UUID: uuid}, nil
 }

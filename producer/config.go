@@ -7,6 +7,20 @@ import (
 	"github.com/IBM/sarama"
 )
 
+// Default configuration values.
+const (
+	// DefaultMaxRetries is the default number of retry attempts for failed messages.
+	DefaultMaxRetries = 3
+	// DefaultRetryBackoff is the default time to wait between retries.
+	DefaultRetryBackoff = 100 * time.Millisecond
+	// DefaultBatchSize is the default maximum size of a batch in bytes (16KB).
+	DefaultBatchSize = 16 * 1024
+	// DefaultLinger is the default time to wait before sending a batch.
+	DefaultLinger = 5 * time.Millisecond
+	// DefaultTimeout is the default timeout for producing messages.
+	DefaultTimeout = 10 * time.Second
+)
+
 // Config holds the configuration for a Kafka producer.
 type Config struct {
 	// Brokers is the list of Kafka broker addresses.
@@ -43,13 +57,13 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		RequiredAcks: sarama.WaitForAll,
-		MaxRetries:   3,
-		RetryBackoff: 100 * time.Millisecond,
-		BatchSize:    16 * 1024, // 16KB
-		Linger:       5 * time.Millisecond,
+		MaxRetries:   DefaultMaxRetries,
+		RetryBackoff: DefaultRetryBackoff,
+		BatchSize:    DefaultBatchSize,
+		Linger:       DefaultLinger,
 		Compression:  sarama.CompressionSnappy,
 		Idempotent:   true,
-		Timeout:      10 * time.Second,
+		Timeout:      DefaultTimeout,
 	}
 }
 

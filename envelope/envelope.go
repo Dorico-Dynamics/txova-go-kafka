@@ -6,12 +6,37 @@ package envelope
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"time"
 
 	txctx "github.com/Dorico-Dynamics/txova-go-core/context"
 	"github.com/Dorico-Dynamics/txova-go-types/ids"
+)
+
+// Sentinel errors for envelope validation.
+var (
+	// ErrEventTypeRequired is returned when event type is empty.
+	ErrEventTypeRequired = errors.New("event type is required")
+	// ErrVersionRequired is returned when version is empty.
+	ErrVersionRequired = errors.New("version is required")
+	// ErrVersionInvalid is returned when version is not in semver format.
+	ErrVersionInvalid = errors.New("version must be in semver format (major.minor)")
+	// ErrSourceRequired is returned when source is empty.
+	ErrSourceRequired = errors.New("source is required")
+	// ErrPayloadRequired is returned when payload is nil or empty.
+	ErrPayloadRequired = errors.New("payload is required")
+	// ErrIDRequired is returned when id is empty.
+	ErrIDRequired = errors.New("id is required")
+	// ErrTimestampRequired is returned when timestamp is zero.
+	ErrTimestampRequired = errors.New("timestamp is required")
+	// ErrCorrelationIDRequired is returned when correlation_id is empty.
+	ErrCorrelationIDRequired = errors.New("correlation_id is required")
+	// ErrDestinationNil is returned when unmarshal destination is nil.
+	ErrDestinationNil = errors.New("destination cannot be nil")
+	// ErrPayloadEmpty is returned when payload is empty for unmarshal.
+	ErrPayloadEmpty = errors.New("payload is empty")
 )
 
 // semverRegex validates version strings in semver format (major.minor).
@@ -131,19 +156,19 @@ func NewWithContext(ctx context.Context, cfg *Config) (*Envelope, error) {
 // validateConfig validates the envelope configuration.
 func validateConfig(cfg *Config) error {
 	if cfg.Type == "" {
-		return fmt.Errorf("event type is required")
+		return ErrEventTypeRequired
 	}
 	if cfg.Version == "" {
-		return fmt.Errorf("version is required")
+		return ErrVersionRequired
 	}
 	if !semverRegex.MatchString(cfg.Version) {
-		return fmt.Errorf("version must be in semver format (major.minor), got: %s", cfg.Version)
+		return fmt.Errorf("%w: got %s", ErrVersionInvalid, cfg.Version)
 	}
 	if cfg.Source == "" {
-		return fmt.Errorf("source is required")
+		return ErrSourceRequired
 	}
 	if cfg.Payload == nil {
-		return fmt.Errorf("payload is required")
+		return ErrPayloadRequired
 	}
 	return nil
 }
@@ -152,7 +177,7 @@ func validateConfig(cfg *Config) error {
 func generateEventID() (string, error) {
 	id, err := ids.NewUserID() // Reusing UUID generation from ids package
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to generate UUID: %w", err)
 	}
 	return id.String(), nil
 }
@@ -160,28 +185,28 @@ func generateEventID() (string, error) {
 // Validate validates that the envelope has all required fields.
 func (e *Envelope) Validate() error {
 	if e.ID == "" {
-		return fmt.Errorf("id is required")
+		return ErrIDRequired
 	}
 	if e.Type == "" {
-		return fmt.Errorf("type is required")
+		return ErrEventTypeRequired
 	}
 	if e.Version == "" {
-		return fmt.Errorf("version is required")
+		return ErrVersionRequired
 	}
 	if !semverRegex.MatchString(e.Version) {
-		return fmt.Errorf("version must be in semver format (major.minor), got: %s", e.Version)
+		return fmt.Errorf("%w: got %s", ErrVersionInvalid, e.Version)
 	}
 	if e.Source == "" {
-		return fmt.Errorf("source is required")
+		return ErrSourceRequired
 	}
 	if e.Timestamp.IsZero() {
-		return fmt.Errorf("timestamp is required")
+		return ErrTimestampRequired
 	}
 	if e.CorrelationID == "" {
-		return fmt.Errorf("correlation_id is required")
+		return ErrCorrelationIDRequired
 	}
 	if len(e.Payload) == 0 {
-		return fmt.Errorf("payload is required")
+		return ErrPayloadRequired
 	}
 	return nil
 }
@@ -189,12 +214,15 @@ func (e *Envelope) Validate() error {
 // UnmarshalPayload unmarshals the payload into the provided destination.
 func (e *Envelope) UnmarshalPayload(dest any) error {
 	if dest == nil {
-		return fmt.Errorf("destination cannot be nil")
+		return ErrDestinationNil
 	}
 	if len(e.Payload) == 0 {
-		return fmt.Errorf("payload is empty")
+		return ErrPayloadEmpty
 	}
-	return json.Unmarshal(e.Payload, dest)
+	if err := json.Unmarshal(e.Payload, dest); err != nil {
+		return fmt.Errorf("failed to unmarshal payload: %w", err)
+	}
+	return nil
 }
 
 // WithCorrelationID returns a copy of the envelope with the given correlation ID.
