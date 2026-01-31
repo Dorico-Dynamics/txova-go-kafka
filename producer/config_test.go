@@ -108,7 +108,10 @@ func TestConfig_toSaramaConfig(t *testing.T) {
 		Timeout:      15 * time.Second,
 	}
 
-	saramaCfg := cfg.toSaramaConfig()
+	saramaCfg, err := cfg.toSaramaConfig()
+	if err != nil {
+		t.Fatalf("toSaramaConfig() error = %v", err)
+	}
 
 	if saramaCfg.ClientID != cfg.ClientID {
 		t.Errorf("ClientID = %q, want %q", saramaCfg.ClientID, cfg.ClientID)
@@ -153,12 +156,18 @@ func TestConfig_toSaramaConfig_NonIdempotent(t *testing.T) {
 	t.Parallel()
 
 	cfg := &Config{
-		Brokers:    []string{"localhost:9092"},
-		ClientID:   "test-client",
-		Idempotent: false,
+		Brokers:      []string{"localhost:9092"},
+		ClientID:     "test-client",
+		Idempotent:   false,
+		RequiredAcks: sarama.WaitForLocal,
+		Timeout:      DefaultTimeout,
+		RetryBackoff: DefaultRetryBackoff,
 	}
 
-	saramaCfg := cfg.toSaramaConfig()
+	saramaCfg, err := cfg.toSaramaConfig()
+	if err != nil {
+		t.Fatalf("toSaramaConfig() error = %v", err)
+	}
 
 	// Non-idempotent should not force MaxOpenRequests = 1
 	if saramaCfg.Net.MaxOpenRequests == 1 {

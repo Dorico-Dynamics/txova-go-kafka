@@ -8,6 +8,8 @@ var (
 	ErrNoBrokers = errors.New("no brokers configured")
 	// ErrNoClientID is returned when no client ID is configured.
 	ErrNoClientID = errors.New("client ID is required")
+	// ErrIdempotentRequiresWaitForAll is returned when idempotent mode is enabled but RequiredAcks is not WaitForAll.
+	ErrIdempotentRequiresWaitForAll = errors.New("idempotent producer requires RequiredAcks = WaitForAll")
 	// ErrProducerClosed is returned when the producer is already closed.
 	ErrProducerClosed = errors.New("producer is closed")
 	// ErrNilEnvelope is returned when attempting to publish a nil envelope.

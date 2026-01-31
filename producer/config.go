@@ -2,6 +2,7 @@
 package producer
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/IBM/sarama"
@@ -75,11 +76,16 @@ func (c *Config) Validate() error {
 	if c.ClientID == "" {
 		return ErrNoClientID
 	}
+	// Idempotent producer requires WaitForAll acknowledgment
+	if c.Idempotent && c.RequiredAcks != sarama.WaitForAll {
+		return ErrIdempotentRequiresWaitForAll
+	}
 	return nil
 }
 
 // toSaramaConfig converts the Config to a sarama.Config.
-func (c *Config) toSaramaConfig() *sarama.Config {
+// It returns the sarama config and any validation error from sarama.
+func (c *Config) toSaramaConfig() (*sarama.Config, error) {
 	cfg := sarama.NewConfig()
 
 	cfg.ClientID = c.ClientID
@@ -99,5 +105,10 @@ func (c *Config) toSaramaConfig() *sarama.Config {
 		cfg.Net.MaxOpenRequests = 1
 	}
 
-	return cfg
+	// Validate the sarama config to catch any misconfiguration
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid sarama config: %w", err)
+	}
+
+	return cfg, nil
 }

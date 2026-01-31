@@ -39,7 +39,10 @@ func New(cfg *Config, logger *slog.Logger) (*Producer, error) {
 		logger = slog.Default()
 	}
 
-	saramaCfg := cfg.toSaramaConfig()
+	saramaCfg, err := cfg.toSaramaConfig()
+	if err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
+	}
 
 	syncProducer, err := sarama.NewSyncProducer(cfg.Brokers, saramaCfg)
 	if err != nil {
@@ -55,6 +58,10 @@ func New(cfg *Config, logger *slog.Logger) (*Producer, error) {
 
 // Publish publishes an envelope to the appropriate topic based on event type.
 func (p *Producer) Publish(ctx context.Context, env *envelope.Envelope, partitionKey string) error {
+	if env == nil {
+		return ErrNilEnvelope
+	}
+
 	topic := topics.ForEventType(events.EventType(env.Type))
 	if topic == "" {
 		return fmt.Errorf("%w: %s", ErrNoTopicForEventType, env.Type)
