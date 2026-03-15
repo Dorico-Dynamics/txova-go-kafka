@@ -15,13 +15,14 @@ import (
 
 // GroupHealthConfig configures the consumer group health checker.
 type GroupHealthConfig struct {
-	Name     string
-	Brokers  []string
-	GroupID  string
-	Topics   []string
-	Required bool
-	MaxLag   int64
-	Logger   *slog.Logger
+	Name         string
+	Brokers      []string
+	GroupID      string
+	Topics       []string
+	Required     bool
+	MaxLag       int64
+	Logger       *slog.Logger
+	SaramaConfig *sarama.Config
 }
 
 type healthAdmin interface {
@@ -71,7 +72,12 @@ func NewGroupHealthChecker(cfg *GroupHealthConfig) (*GroupHealthChecker, error) 
 		logger = slog.Default()
 	}
 
-	client, err := sarama.NewClient(cfg.Brokers, DefaultConfig().toSaramaConfig())
+	saramaCfg := cfg.SaramaConfig
+	if saramaCfg == nil {
+		saramaCfg = DefaultConfig().toSaramaConfig()
+	}
+
+	client, err := sarama.NewClient(cfg.Brokers, saramaCfg)
 	if err != nil {
 		return nil, fmt.Errorf("creating kafka client: %w", err)
 	}
@@ -139,11 +145,11 @@ func (c *GroupHealthChecker) Close() error {
 func (c *GroupHealthChecker) Check(ctx context.Context) obshealth.Result {
 	start := time.Now()
 
+	if c == nil || ctx == nil || c.client == nil || c.admin == nil {
+		return obshealth.NewUnhealthyResult(time.Since(start), ErrCheckerNotInitialized)
+	}
 	if err := ctx.Err(); err != nil {
 		return obshealth.NewUnhealthyResult(time.Since(start), err)
-	}
-	if c.client == nil || c.admin == nil {
-		return obshealth.NewUnhealthyResult(time.Since(start), ErrCheckerNotInitialized)
 	}
 
 	description, err := c.describeGroup()
@@ -164,6 +170,10 @@ func (c *GroupHealthChecker) Check(ctx context.Context) obshealth.Result {
 		return obshealth.NewUnhealthyResult(time.Since(start), err)
 	}
 
+	return c.evaluateHealth(ctx, start, description, assignedPartitions)
+}
+
+func (c *GroupHealthChecker) evaluateHealth(ctx context.Context, start time.Time, description *sarama.GroupDescription, assignedPartitions int) obshealth.Result {
 	metaDetails := map[string]any{
 		"group_id":            c.groupID,
 		"group_state":         description.State,
@@ -183,6 +193,9 @@ func (c *GroupHealthChecker) Check(ctx context.Context) obshealth.Result {
 	lagSummary, err := c.calculateLag()
 	if err != nil {
 		c.logger.Warn("consumer group lag check failed", "group_id", c.groupID, "error", err.Error())
+		return obshealth.NewUnhealthyResult(time.Since(start), err)
+	}
+	if err := ctx.Err(); err != nil {
 		return obshealth.NewUnhealthyResult(time.Since(start), err)
 	}
 

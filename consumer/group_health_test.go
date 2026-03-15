@@ -404,6 +404,31 @@ func TestGroupHealthCheckerCheckContextCancelled(t *testing.T) {
 	})
 }
 
+func TestGroupHealthCheckerCheckNilGuards(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil receiver", func(t *testing.T) {
+		t.Parallel()
+		var checker *GroupHealthChecker
+		result := checker.Check(context.Background())
+		if result.Status != obshealth.StatusUnhealthy {
+			t.Fatalf("status = %v, want unhealthy", result.Status)
+		}
+	})
+
+	t.Run("nil context", func(t *testing.T) {
+		t.Parallel()
+		checker := &GroupHealthChecker{
+			client: &fakeHealthClient{},
+			admin:  &fakeHealthAdmin{},
+		}
+		result := checker.Check(nil) //nolint:staticcheck // testing nil ctx guard
+		if result.Status != obshealth.StatusUnhealthy {
+			t.Fatalf("status = %v, want unhealthy", result.Status)
+		}
+	})
+}
+
 func newOffsetFetchResponse(offsets map[string]map[int32]int64) *sarama.OffsetFetchResponse {
 	response := &sarama.OffsetFetchResponse{
 		Blocks: make(map[string]map[int32]*sarama.OffsetFetchResponseBlock, len(offsets)),
