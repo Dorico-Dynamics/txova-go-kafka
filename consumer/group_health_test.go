@@ -329,20 +329,20 @@ func TestNewGroupHealthCheckerValidation(t *testing.T) {
 	tests := []struct {
 		name    string
 		cfg     *GroupHealthConfig
-		wantErr string
+		wantErr error
 	}{
-		{name: "nil config", cfg: nil, wantErr: "config is required"},
-		{name: "no brokers", cfg: &GroupHealthConfig{GroupID: "g", Topics: []string{"t"}}, wantErr: "brokers"},
-		{name: "no group ID", cfg: &GroupHealthConfig{Brokers: []string{"b"}, Topics: []string{"t"}}, wantErr: "group ID"},
-		{name: "no topics", cfg: &GroupHealthConfig{Brokers: []string{"b"}, GroupID: "g"}, wantErr: "topics"},
+		{name: "nil config", cfg: nil, wantErr: ErrConfigRequired},
+		{name: "no brokers", cfg: &GroupHealthConfig{GroupID: "g", Topics: []string{"t"}}, wantErr: ErrNoBrokers},
+		{name: "no group ID", cfg: &GroupHealthConfig{Brokers: []string{"b"}, Topics: []string{"t"}}, wantErr: ErrNoGroupID},
+		{name: "no topics", cfg: &GroupHealthConfig{Brokers: []string{"b"}, GroupID: "g"}, wantErr: ErrNoTopics},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			_, err := NewGroupHealthChecker(tt.cfg)
-			if err == nil {
-				t.Fatal("expected error")
+			if !errors.Is(err, tt.wantErr) {
+				t.Fatalf("error = %v, want %v", err, tt.wantErr)
 			}
 		})
 	}

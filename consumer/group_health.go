@@ -54,7 +54,7 @@ var _ obshealth.Checker = (*GroupHealthChecker)(nil)
 // NewGroupHealthChecker creates a health checker for a Kafka consumer group.
 func NewGroupHealthChecker(cfg *GroupHealthConfig) (*GroupHealthChecker, error) {
 	if cfg == nil {
-		return nil, fmt.Errorf("config is required")
+		return nil, ErrConfigRequired
 	}
 	if len(cfg.Brokers) == 0 {
 		return nil, ErrNoBrokers
@@ -143,7 +143,7 @@ func (c *GroupHealthChecker) Check(ctx context.Context) obshealth.Result {
 		return obshealth.NewUnhealthyResult(time.Since(start), err)
 	}
 	if c.client == nil || c.admin == nil {
-		return obshealth.NewUnhealthyResult(time.Since(start), fmt.Errorf("checker is not initialized"))
+		return obshealth.NewUnhealthyResult(time.Since(start), ErrCheckerNotInitialized)
 	}
 
 	description, err := c.describeGroup()
@@ -164,6 +164,22 @@ func (c *GroupHealthChecker) Check(ctx context.Context) obshealth.Result {
 		return obshealth.NewUnhealthyResult(time.Since(start), err)
 	}
 
+	metaDetails := map[string]any{
+		"group_id":            c.groupID,
+		"group_state":         description.State,
+		"members":             len(description.Members),
+		"assigned_partitions": assignedPartitions,
+		"topics":              c.sortedTopics(),
+	}
+
+	if len(description.Members) == 0 || assignedPartitions == 0 {
+		return obshealth.NewUnhealthyResult(time.Since(start), ErrNoPartitionAssignments).WithDetails(metaDetails)
+	}
+
+	if description.State != "Stable" {
+		return obshealth.NewDegradedResult(time.Since(start), "consumer group state is "+description.State).WithDetails(metaDetails)
+	}
+
 	lagSummary, err := c.calculateLag()
 	if err != nil {
 		c.logger.Warn("consumer group lag check failed", "group_id", c.groupID, "error", err.Error())
@@ -181,14 +197,6 @@ func (c *GroupHealthChecker) Check(ctx context.Context) obshealth.Result {
 		"lag_by_partition":    lagSummary.byPartition,
 	}
 
-	if len(description.Members) == 0 || assignedPartitions == 0 {
-		return obshealth.NewUnhealthyResult(time.Since(start), fmt.Errorf("consumer group has no active partition assignments")).WithDetails(details)
-	}
-
-	if description.State != "Stable" {
-		return obshealth.NewDegradedResult(time.Since(start), fmt.Sprintf("consumer group state is %s", description.State)).WithDetails(details)
-	}
-
 	if c.maxLag > 0 && lagSummary.totalLag > c.maxLag {
 		return obshealth.NewDegradedResult(time.Since(start), fmt.Sprintf("consumer group lag %d exceeds threshold %d", lagSummary.totalLag, c.maxLag)).WithDetails(details)
 	}
@@ -202,7 +210,7 @@ func (c *GroupHealthChecker) describeGroup() (*sarama.GroupDescription, error) {
 		return nil, fmt.Errorf("describing consumer group %s: %w", c.groupID, err)
 	}
 	if len(groups) == 0 || groups[0] == nil {
-		return nil, fmt.Errorf("consumer group %s not found", c.groupID)
+		return nil, fmt.Errorf("%s: %w", c.groupID, ErrGroupNotFound)
 	}
 
 	group := groups[0]
@@ -264,7 +272,7 @@ func (c *GroupHealthChecker) calculateLag() (lagSummary, error) {
 
 			block := offsets.GetBlock(topic, partition)
 			if block == nil {
-				return lagSummary{}, fmt.Errorf("missing committed offset for %s[%d]", topic, partition)
+				return lagSummary{}, fmt.Errorf("%s[%d]: %w", topic, partition, ErrMissingCommittedOffset)
 			}
 			if block.Err != sarama.ErrNoError {
 				return lagSummary{}, fmt.Errorf("getting committed offset for %s[%d]: %w", topic, partition, block.Err)
