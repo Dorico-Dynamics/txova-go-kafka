@@ -2,6 +2,7 @@ package consumer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -119,22 +120,19 @@ func (c *GroupHealthChecker) Close() error {
 
 	var adminErr error
 	if c.admin != nil {
-		adminErr = c.admin.Close()
+		if err := c.admin.Close(); err != nil {
+			adminErr = fmt.Errorf("closing kafka admin client: %w", err)
+		}
 	}
 
 	var clientErr error
 	if c.client != nil {
-		clientErr = c.client.Close()
+		if err := c.client.Close(); err != nil {
+			clientErr = fmt.Errorf("closing kafka client: %w", err)
+		}
 	}
 
-	if adminErr != nil {
-		return fmt.Errorf("closing kafka admin client: %w", adminErr)
-	}
-	if clientErr != nil {
-		return fmt.Errorf("closing kafka client: %w", clientErr)
-	}
-
-	return nil
+	return errors.Join(adminErr, clientErr)
 }
 
 // Check evaluates the health of the consumer group.
@@ -153,10 +151,16 @@ func (c *GroupHealthChecker) Check(ctx context.Context) obshealth.Result {
 		c.logger.Warn("consumer group describe failed", "group_id", c.groupID, "error", err.Error())
 		return obshealth.NewUnhealthyResult(time.Since(start), err)
 	}
+	if err = ctx.Err(); err != nil {
+		return obshealth.NewUnhealthyResult(time.Since(start), err)
+	}
 
 	assignedPartitions, err := c.countAssignedPartitions(description)
 	if err != nil {
 		c.logger.Warn("consumer group assignment decode failed", "group_id", c.groupID, "error", err.Error())
+		return obshealth.NewUnhealthyResult(time.Since(start), err)
+	}
+	if err = ctx.Err(); err != nil {
 		return obshealth.NewUnhealthyResult(time.Since(start), err)
 	}
 
