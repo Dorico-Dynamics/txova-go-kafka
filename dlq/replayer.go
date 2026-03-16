@@ -17,6 +17,8 @@ import (
 var (
 	// ErrNilReplayHandler is returned when a replayer is created without a handler.
 	ErrNilReplayHandler = errors.New("replay handler cannot be nil")
+	// ErrNilConsumerGroup is returned when a replayer is created without a consumer group.
+	ErrNilConsumerGroup = errors.New("consumer group is required")
 	// ErrEmptyDLQTopic is returned when a replayer is created without a DLQ topic.
 	ErrEmptyDLQTopic = errors.New("dlq topic is required")
 	// ErrReplayerClosed is returned when replay is attempted after close.
@@ -59,6 +61,12 @@ func NewReplayer(cfg *consumer.Config, dlqTopic string, handler ReplayHandler, l
 	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
+	if dlqTopic == "" {
+		return nil, ErrEmptyDLQTopic
+	}
+	if handler == nil {
+		return nil, ErrNilReplayHandler
+	}
 
 	group, err := sarama.NewConsumerGroup(cfg.Brokers, cfg.GroupID, toSaramaConfig(cfg))
 	if err != nil {
@@ -96,7 +104,7 @@ func NewReplayerWithConsumerGroup(
 	logger *slog.Logger,
 ) (*Replayer, error) {
 	if group == nil {
-		return nil, fmt.Errorf("consumer group is required")
+		return nil, ErrNilConsumerGroup
 	}
 	if dlqTopic == "" {
 		return nil, ErrEmptyDLQTopic
@@ -129,15 +137,14 @@ func (r *Replayer) ReplayWithFilter(ctx context.Context, filter ReplayFilter) er
 		r.mu.RUnlock()
 		return ErrReplayerClosed
 	}
+	r.wg.Add(1)
 	r.mu.RUnlock()
+	defer r.wg.Done()
 
 	handler := &replayerGroupHandler{
 		replayer: r,
 		filter:   filter,
 	}
-
-	r.wg.Add(1)
-	defer r.wg.Done()
 
 	for {
 		if err := ctx.Err(); err != nil {
@@ -235,13 +242,15 @@ func (h *replayerGroupHandler) Cleanup(_ sarama.ConsumerGroupSession) error {
 
 func (h *replayerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	for msg := range claim.Messages() {
-		h.processMessage(session, msg)
+		if err := h.processMessage(session, msg); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (h *replayerGroupHandler) processMessage(session sarama.ConsumerGroupSession, msg *sarama.ConsumerMessage) {
+func (h *replayerGroupHandler) processMessage(session sarama.ConsumerGroupSession, msg *sarama.ConsumerMessage) error {
 	ctx := session.Context()
 	h.replayer.incrementConsumed()
 
@@ -255,7 +264,8 @@ func (h *replayerGroupHandler) processMessage(session sarama.ConsumerGroupSessio
 		)
 		h.replayer.incrementSkipped()
 		session.MarkMessage(msg, "")
-		return
+
+		return nil
 	}
 
 	if dlqMsg.Envelope == nil {
@@ -266,13 +276,15 @@ func (h *replayerGroupHandler) processMessage(session sarama.ConsumerGroupSessio
 		)
 		h.replayer.incrementSkipped()
 		session.MarkMessage(msg, "")
-		return
+
+		return nil
 	}
 
 	if h.filter != nil && !h.filter(&dlqMsg) {
 		h.replayer.incrementSkipped()
 		session.MarkMessage(msg, "")
-		return
+
+		return nil
 	}
 
 	if err := h.replayer.handler(ctx, dlqMsg.Envelope, &dlqMsg); err != nil {
@@ -283,9 +295,12 @@ func (h *replayerGroupHandler) processMessage(session sarama.ConsumerGroupSessio
 			slog.String("error", err.Error()),
 		)
 		h.replayer.incrementFailed()
-		return
+
+		return fmt.Errorf("replay handler failed for %s/%d/%d: %w", msg.Topic, msg.Partition, msg.Offset, err)
 	}
 
 	h.replayer.incrementReplayed()
 	session.MarkMessage(msg, "")
+
+	return nil
 }

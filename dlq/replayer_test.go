@@ -181,7 +181,7 @@ func TestNewReplayerWithConsumerGroup_Validation(t *testing.T) {
 		handler ReplayHandler
 		wantErr error
 	}{
-		{name: "nil group", topic: "txova.users.v1.dlq", handler: handler},
+		{name: "nil group", topic: "txova.users.v1.dlq", handler: handler, wantErr: ErrNilConsumerGroup},
 		{name: "empty topic", group: newMockReplayConsumerGroup(), handler: handler, wantErr: ErrEmptyDLQTopic},
 		{name: "nil handler", group: newMockReplayConsumerGroup(), topic: "txova.users.v1.dlq", wantErr: ErrNilReplayHandler},
 	}
@@ -217,7 +217,9 @@ func TestReplayerGroupHandler_ProcessMessage_Success(t *testing.T) {
 	session := newMockReplayConsumerGroupSession(context.Background())
 	msg := buildDLQConsumerMessage(t, "ATXid_123")
 
-	handler.processMessage(session, msg)
+	if err := handler.processMessage(session, msg); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if !replayed {
 		t.Fatal("expected replay handler to be called")
@@ -251,7 +253,9 @@ func TestReplayerGroupHandler_ProcessMessage_Filtered(t *testing.T) {
 	}
 	session := newMockReplayConsumerGroupSession(context.Background())
 
-	handler.processMessage(session, buildDLQConsumerMessage(t, "ATXid_123"))
+	if err := handler.processMessage(session, buildDLQConsumerMessage(t, "ATXid_123")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if session.MarkedCount() != 1 {
 		t.Fatalf("expected filtered message to be marked, got %d", session.MarkedCount())
@@ -280,7 +284,9 @@ func TestReplayerGroupHandler_ProcessMessage_InvalidPayload(t *testing.T) {
 		Value: []byte(`not-json`),
 	}
 
-	handler.processMessage(session, msg)
+	if err := handler.processMessage(session, msg); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if session.MarkedCount() != 1 {
 		t.Fatalf("expected invalid payload to be marked, got %d", session.MarkedCount())
@@ -304,7 +310,10 @@ func TestReplayerGroupHandler_ProcessMessage_HandlerError(t *testing.T) {
 	handler := &replayerGroupHandler{replayer: replayer}
 	session := newMockReplayConsumerGroupSession(context.Background())
 
-	handler.processMessage(session, buildDLQConsumerMessage(t, "ATXid_123"))
+	err := handler.processMessage(session, buildDLQConsumerMessage(t, "ATXid_123"))
+	if err == nil {
+		t.Fatal("expected error from processMessage")
+	}
 
 	if session.MarkedCount() != 0 {
 		t.Fatalf("expected failed replay to remain unmarked, got %d", session.MarkedCount())
